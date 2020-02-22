@@ -1,0 +1,292 @@
+#1-backend.json
+{
+    "version": 1,
+    "storageDriverName": "ontap-nas",
+    "backendName": "LN-Volume",
+    "managementLIF": "192.168.230.51",
+    "svm": "svm1",
+    "username": "admin",
+    "password": "root1234",
+    "limitAggregateUsage": "90%",
+    "limitVolumeSize": "8000Gi",
+    "nfsMountOptions": "nfsvers=3",
+    "defaults": {
+        "spaceReserve": "none",
+        "exportPolicy": "myk8scluster",
+        "snapshotPolicy": "none",
+        "snapshotReserve": "0",
+        "splitOnClone": "false",
+        "unixPermissions": "777",
+        "snapshotDir": "false",
+        "securityStyle": "unix"
+    }
+}
+#1-backend_qtree.json
+{
+    "version": 1,
+    "storageDriverName": "ontap-nas-economy",
+    "backendName": "LN-Qtree",
+    "managementLIF": "192.168.230.51",
+    "svm": "svm1",
+    "username": "admin",
+    "password": "root1234",
+    "limitAggregateUsage": "80%",
+    "limitVolumeSize": "8Gi",
+    "nfsMountOptions": "nfsvers=3",
+    "defaults": {
+        "spaceReserve": "none",
+        "exportPolicy": "myk8scluster",
+        "snapshotPolicy": "none",
+        "snapshotReserve": "0"
+    }
+}
+#2-sc_qtree.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: qtree
+#provisioner: netapp.io/trident
+provisioner: csi.trident.netapp.io
+parameters:
+  backendType: "ontap-nas-economy"
+  storagePools: "LN-Qtree:aggr2_cluster1_01"
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+#2-sc_volume.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: volume
+#provisioner: netapp.io/trident
+provisioner: csi.trident.netapp.io
+parameters:
+  backendType: "ontap-nas"
+  media: "hdd"
+  provisioningType: "thin"
+  snapshots: "true"
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+#3-pvc-qtree1.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: qt1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+  storageClassName: qtree
+#3-pvc-qtree2.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: qt2
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 4Gi
+  storageClassName: qtree
+#3-pvc-volume1.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: v1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: volume
+#3-pvc-volume2.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: v2
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: volume
+#4-task-pv-pod2.yaml
+kind: Pod
+apiVersion: v1
+metadata:
+  name: task-pv-pod2
+spec:
+  volumes:
+    - name: task-pv-storage1
+      persistentVolumeClaim:
+        claimName: v1
+    - name: task-pv-storage2
+      persistentVolumeClaim:
+        claimName: qt1
+  containers:
+    - name: task-pv-container
+      image: nginx:1.17
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html1"
+          name: task-pv-storage1
+        - mountPath: "/usr/share/nginx/html2"
+          name: task-pv-storage2
+#4-task-pv-pod3.yaml
+kind: Pod
+apiVersion: v1
+metadata:
+  name: task-pv-pod3
+spec:
+  volumes:
+    - name: task-pv-storage1
+      persistentVolumeClaim:
+        claimName: v1
+    - name: task-pv-storage2
+      persistentVolumeClaim:
+        claimName: qt1
+  containers:
+    - name: task-pv-container
+      image: nginx:1.17
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html1"
+          name: task-pv-storage1
+        - mountPath: "/usr/share/nginx/html2"
+          name: task-pv-storage2
+#4-task-pv-pod.yaml
+kind: Pod
+apiVersion: v1
+metadata:
+  name: task-pv-pod
+spec:
+  volumes:
+    - name: task-pv-storage1
+      persistentVolumeClaim:
+        claimName: v1
+    - name: task-pv-storage2
+      persistentVolumeClaim:
+        claimName: qt1
+  containers:
+    - name: task-pv-container
+      image: nginx:1.17
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html1"
+          name: task-pv-storage1
+        - mountPath: "/usr/share/nginx/html2"
+          name: task-pv-storage2
+#5-task-pv-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myweb
+  labels:
+    app: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx117
+  template:
+    metadata:
+      labels:
+        app: nginx117
+    spec:
+      volumes:
+        - name: task-pv-storage1
+          persistentVolumeClaim:
+            claimName: v2
+        - name: task-pv-storage2
+          persistentVolumeClaim:
+            claimName: qt2
+      containers:
+        - name: task-pv-container
+          image: nginx:1.17
+          ports:
+            - containerPort: 80
+              name: "http-server"
+          volumeMounts:
+            - mountPath: "/usr/share/nginx/html1"
+              name: task-pv-storage1
+            - mountPath: "/usr/share/nginx/html2"
+              name: task-pv-storage2
+#6-snapshot-sc.yaml
+apiVersion: snapshot.storage.k8s.io/v1alpha1
+kind: VolumeSnapshotClass
+metadata:
+  name: csi-snapclass
+snapshotter: csi.trident.netapp.io
+#6-volume-snapshot-qtree.yaml
+apiVersion: snapshot.storage.k8s.io/v1alpha1
+kind: VolumeSnapshot
+metadata:
+  name: qt1-snap
+spec:
+  snapshotClassName: csi-snapclass
+  source:
+    name: qt1
+    kind: PersistentVolumeClaim
+#6-volume-snapshot.yaml
+apiVersion: snapshot.storage.k8s.io/v1alpha1
+kind: VolumeSnapshot
+metadata:
+  name: v1-snap
+spec:
+  snapshotClassName: csi-snapclass
+  source:
+    name: v1
+    kind: PersistentVolumeClaim
+#7-volume-clone-from-snapshot.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: v1-clone-from-snap
+spec:
+  storageClassName: volume
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  dataSource:
+    name: v1-snap
+    kind: VolumeSnapshot
+    apiGroup: snapshot.storage.k8s.io
+
+#7-volume-clone.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: v1-clone1
+spec:
+  storageClassName: volume
+  dataSource:
+    name: v1
+    kind: PersistentVolumeClaim
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+#8-volume-import.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: volimport
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: volume
