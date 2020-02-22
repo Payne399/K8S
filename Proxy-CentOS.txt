@@ -1,0 +1,12 @@
+[root@k8s1 ~]# cat /etc/systemd/system/docker.service.d/http-proxy.conf
+[Service]
+Environment="HTTP_PROXY=http://192.168.230.1:1080"
+[root@k8s1 ~]# tail -5 /etc/yum.conf
+# metadata_expire=90m
+
+# PUT YOUR REPOS HERE OR IN separate files named file.repo
+# in /etc/yum.repos.d
+proxy=http://192.168.230.1:1080
+[root@k8s1 ~]# cat /etc/systemd/system/docker.service.d/http-proxy.conf
+[Service]
+Environment="HTTP_PROXY=http://192.168.230.1:1080"
