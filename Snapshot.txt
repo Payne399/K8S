@@ -1,0 +1,31 @@
+The Kubernetes Volume Snapshot feature is now beta in Kubernetes v1.17. 
+It was introduced as alpha in Kubernetes v1.12, with a second alpha with breaking changes in Kubernetes v1.13. 
+
+
+What’s new in Beta?
+With the promotion of Volume Snapshot to beta, the feature is now enabled by default on standard Kubernetes deployments instead of being opt-in.
+
+The move of the Kubernetes Volume Snapshot feature to beta also means:
+
+A revamp of volume snapshot APIs.
+The CSI external-snapshotter sidecar is split into two controllers, a common snapshot controller and a CSI external-snapshotter sidecar.
+Deletion secret is added as an annotation to the volume snapshot content.
+A new finalizer is added to the volume snapshot API object to prevent it from being deleted when it is bound to a volume snapshot content API object.
+
+如果想在低版本开启功能，需要修改配置文件，打开feature gates
+https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/
+
+Feature	                  Default	Stage	Since	Until
+VolumePVCDataSource	      false 	Alpha	1.15	1.15
+VolumePVCDataSource	      true	  Beta	1.16	
+VolumeSnapshotDataSource	false	  Alpha	1.12	1.16
+VolumeSnapshotDataSource	true	  Beta	1.17
+-----------------------------------------------------
+1.16默认开启了克隆支持，1.17默认开启了快照支持
+
+With the expectation that alpha snapshots would not have been used in production, Kubernetes doesn’t provide a graceful way to migrate alpha snapshots to the beta spec available from K8s 1.17.
+
+To help accelerate customers’ cloud native journey and enable them to run their stateful applications in containers, the two most recent releases of Trident (19.07 and 19.10) enabled the creation of PVC snapshots using the Kubernetes volume snapshots alpha feature.
+
+Beginning with the 20.01 release, Trident only enables the creation of beta Volume Snapshots. When upgrading to 19.07.2 or above, all previous alpha snapshot CRs and CRDs (Volume Snapshot Classes, Volume Snapshots and Volume Snapshot Contents) must be removed before the upgrade is performed. 
+
